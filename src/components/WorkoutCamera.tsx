@@ -11,6 +11,7 @@ const WorkoutCamera: React.FC = () => {
 
   useEffect(() => {
     if (selectedExercise && currentSession) {
+      // Start camera immediately when component loads
       startCamera();
     }
     
@@ -39,7 +40,7 @@ const WorkoutCamera: React.FC = () => {
   }
 
   return (
-    <div className="video-container aspect-video">
+    <div className="video-container aspect-video relative">
       <video
         ref={videoRef}
         autoPlay
@@ -48,9 +49,9 @@ const WorkoutCamera: React.FC = () => {
         className="rounded-lg h-full w-full object-cover"
       />
       {!isCameraReady && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/75 text-white">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/75 text-white rounded-lg">
           <div className="text-center">
-            <div className="animate-pulse-strong mb-2">
+            <div className="animate-pulse mb-2">
               <Camera className="h-10 w-10 mx-auto" />
             </div>
             <p>Loading camera...</p>

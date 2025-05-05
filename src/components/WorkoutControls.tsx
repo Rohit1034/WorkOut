@@ -3,13 +3,15 @@ import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useWorkout } from '@/context/WorkoutContext';
 import { useTimer } from '@/hooks/useTimer';
-import { ArrowUp } from 'lucide-react';
+import { ArrowUp, StopCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 const WorkoutControls: React.FC = () => {
   const { selectedExercise, currentSession, incrementRepetitions, endWorkout } = useWorkout();
   const { seconds, isRunning, startTimer, pauseTimer, formatTime } = useTimer();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [isWorkoutEnded, setIsWorkoutEnded] = useState(false);
   
   useEffect(() => {
@@ -31,6 +33,7 @@ const WorkoutControls: React.FC = () => {
     pauseTimer();
     endWorkout();
     setIsWorkoutEnded(true);
+    navigate('/summary');
   };
   
   if (!selectedExercise || !currentSession) {
@@ -64,6 +67,7 @@ const WorkoutControls: React.FC = () => {
           variant="outline"
           className="flex-1 border-fitmitra-primary text-fitmitra-primary hover:bg-fitmitra-accent h-16"
         >
+          <StopCircle className="mr-2 h-5 w-5" />
           End Workout
         </Button>
       </div>
