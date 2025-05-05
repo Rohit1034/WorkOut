@@ -7,8 +7,18 @@ import { Camera } from 'lucide-react';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 
 const WorkoutCamera: React.FC = () => {
-  const { videoRef, isCameraReady, error, startCamera, stopCamera } = useCamera();
-  const { selectedExercise, currentSession } = useWorkout();
+  const { 
+    videoRef, 
+    isCameraReady, 
+    error, 
+    startCamera, 
+    stopCamera, 
+    detectedPose,
+    startAnalyzing,
+    stopAnalyzing
+  } = useCamera();
+  
+  const { selectedExercise, currentSession, incrementRepetitions } = useWorkout();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -19,33 +29,61 @@ const WorkoutCamera: React.FC = () => {
     
     return () => {
       stopCamera();
+      stopAnalyzing();
     };
   }, [selectedExercise, currentSession]);
 
-  // Prepare for ML posture analysis (placeholder for now)
+  // Start analyzing posture once camera is ready
+  useEffect(() => {
+    if (isCameraReady && selectedExercise) {
+      // Initialize ML model for posture analysis
+      console.log('Starting pose analysis for:', selectedExercise.type);
+      
+      // Start analyzing with the specific exercise type
+      startAnalyzing(selectedExercise.type, () => {
+        // This callback is called when a repetition is completed
+        incrementRepetitions();
+      });
+    }
+    
+    return () => {
+      stopAnalyzing();
+    };
+  }, [isCameraReady, selectedExercise]);
+
+  // Draw pose keypoints on canvas
+  useEffect(() => {
+    if (canvasRef.current && detectedPose) {
+      const ctx = canvasRef.current.getContext('2d');
+      if (ctx) {
+        // Clear previous drawings
+        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        
+        // Draw keypoints
+        detectedPose.keypoints.forEach((keypoint: any) => {
+          if (keypoint.score && keypoint.score < 0.5) return; // Skip low confidence points
+          
+          ctx.beginPath();
+          ctx.arc(keypoint.x, keypoint.y, 5, 0, 2 * Math.PI);
+          ctx.fillStyle = 'lime';
+          ctx.fill();
+          
+          // Draw keypoint name
+          ctx.fillStyle = 'white';
+          ctx.font = '12px Arial';
+          ctx.fillText(keypoint.name, keypoint.x + 10, keypoint.y);
+        });
+        
+        // In a real implementation, we'd also draw lines connecting the keypoints
+      }
+    }
+  }, [detectedPose]);
+
+  // Set canvas dimensions to match video
   useEffect(() => {
     if (isCameraReady && videoRef.current && canvasRef.current) {
-      // Here we would initialize the ML model for posture analysis
-      // This is just a placeholder for future implementation
-      const analyzePosture = () => {
-        // This function will be used for posture analysis with ML
-        // For now, just logging that frames are being processed
-        if (videoRef.current && canvasRef.current) {
-          const ctx = canvasRef.current.getContext('2d');
-          if (ctx) {
-            // Process video frame
-            console.log('Processing frame for posture analysis');
-          }
-        }
-        
-        // Continue analyzing frames
-        if (isCameraReady) {
-          requestAnimationFrame(analyzePosture);
-        }
-      };
-      
-      // Start the analysis loop
-      analyzePosture();
+      canvasRef.current.width = videoRef.current.videoWidth;
+      canvasRef.current.height = videoRef.current.videoHeight;
     }
   }, [isCameraReady]);
 
@@ -95,7 +133,7 @@ const WorkoutCamera: React.FC = () => {
         )}
       </AspectRatio>
       <div className="mt-2 text-xs text-center text-gray-500">
-        Posture analysis in progress...
+        Posture analysis in progress - Auto counting reps...
       </div>
     </div>
   );

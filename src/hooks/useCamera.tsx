@@ -1,5 +1,6 @@
 
 import { useState, useEffect, useRef } from 'react';
+import { generateMockPose, analyzeExercise } from '@/utils/poseAnalysis';
 
 export const useCamera = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -7,6 +8,9 @@ export const useCamera = () => {
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cameraResolution, setCameraResolution] = useState({ width: 640, height: 480 }); // 4:3 ratio
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [detectedPose, setDetectedPose] = useState<any>(null);
+  const analyzeIntervalRef = useRef<number | null>(null);
 
   const startCamera = async () => {
     try {
@@ -52,6 +56,12 @@ export const useCamera = () => {
       streamRef.current = null;
       setIsCameraReady(false);
     }
+    
+    if (analyzeIntervalRef.current) {
+      clearInterval(analyzeIntervalRef.current);
+      analyzeIntervalRef.current = null;
+      setIsAnalyzing(false);
+    }
   };
 
   // Capture a frame from the video
@@ -69,10 +79,45 @@ export const useCamera = () => {
     }
     return null;
   };
+  
+  // Start analyzing exercise movements
+  const startAnalyzing = (exerciseType: string, onRepComplete: () => void) => {
+    if (analyzeIntervalRef.current) {
+      clearInterval(analyzeIntervalRef.current);
+    }
+    
+    setIsAnalyzing(true);
+    
+    // In real implementation, this would analyze video frames
+    // For now, we'll use mock data to simulate pose detection
+    analyzeIntervalRef.current = window.setInterval(() => {
+      // Generate mock pose data
+      const pose = generateMockPose(exerciseType);
+      setDetectedPose(pose);
+      
+      // Analyze exercise and check if rep is completed
+      const isRepCompleted = analyzeExercise(exerciseType, pose);
+      
+      if (isRepCompleted) {
+        // Call callback function when rep is completed
+        onRepComplete();
+      }
+    }, 500); // Check every 500ms
+  };
+  
+  const stopAnalyzing = () => {
+    if (analyzeIntervalRef.current) {
+      clearInterval(analyzeIntervalRef.current);
+      analyzeIntervalRef.current = null;
+      setIsAnalyzing(false);
+      setDetectedPose(null);
+    }
+  };
 
   useEffect(() => {
     return () => {
       stopCamera();
+      stopAnalyzing();
     };
   }, []);
 
@@ -83,6 +128,10 @@ export const useCamera = () => {
     startCamera,
     stopCamera,
     captureFrame,
-    cameraResolution
+    cameraResolution,
+    detectedPose,
+    isAnalyzing,
+    startAnalyzing,
+    stopAnalyzing
   };
 };
