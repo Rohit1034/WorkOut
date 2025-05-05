@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useWorkout } from '@/context/WorkoutContext';
 import { useNavigate } from 'react-router-dom';
@@ -15,8 +15,16 @@ const WorkoutSummary: React.FC = () => {
     navigate('/');
   };
   
+  // Use useEffect to navigate if no workout exists, instead of returning from the function
+  useEffect(() => {
+    if (!latestWorkout) {
+      handleGoHome();
+    }
+  }, [latestWorkout]);
+  
+  // If no workout found, render a loading state until navigation happens
   if (!latestWorkout) {
-    return handleGoHome();
+    return <div className="p-4 text-center">Loading...</div>;
   }
   
   const formatDuration = (seconds: number) => {
