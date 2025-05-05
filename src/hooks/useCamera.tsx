@@ -6,6 +6,7 @@ export const useCamera = () => {
   const streamRef = useRef<MediaStream | null>(null);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cameraResolution, setCameraResolution] = useState({ width: 640, height: 480 }); // 4:3 ratio
 
   const startCamera = async () => {
     try {
@@ -14,7 +15,12 @@ export const useCamera = () => {
       }
       
       const constraints = {
-        video: { facingMode: 'user' }
+        video: { 
+          facingMode: 'user',
+          width: { ideal: cameraResolution.width },
+          height: { ideal: cameraResolution.height },
+          aspectRatio: { ideal: 4/3 }
+        }
       };
       
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -24,6 +30,14 @@ export const useCamera = () => {
         videoRef.current.srcObject = stream;
         videoRef.current.onloadedmetadata = () => {
           setIsCameraReady(true);
+          
+          // Update the actual resolution we got
+          if (videoRef.current) {
+            setCameraResolution({
+              width: videoRef.current.videoWidth,
+              height: videoRef.current.videoHeight
+            });
+          }
         };
       }
     } catch (err) {
@@ -40,6 +54,22 @@ export const useCamera = () => {
     }
   };
 
+  // Capture a frame from the video
+  const captureFrame = () => {
+    if (!videoRef.current || !isCameraReady) return null;
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL('image/jpeg');
+    }
+    return null;
+  };
+
   useEffect(() => {
     return () => {
       stopCamera();
@@ -51,6 +81,8 @@ export const useCamera = () => {
     isCameraReady,
     error,
     startCamera,
-    stopCamera
+    stopCamera,
+    captureFrame,
+    cameraResolution
   };
 };
