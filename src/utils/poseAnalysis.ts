@@ -16,6 +16,16 @@ let squatDown = false;
 let pullupUp = false;
 let skippingUp = false;
 
+// Debounce flags to prevent noisy detections
+let lastSquatState = false;
+let lastPullupState = false;
+let lastSkippingState = false;
+
+// Counter for continuous frames detecting the same position
+let squatPositionCounter = 0;
+let pullupPositionCounter = 0; 
+let skippingPositionCounter = 0;
+
 // Calculate angle between three points
 export const calculateAngle = (
   pointA: KeyPoint | undefined,
@@ -47,50 +57,159 @@ export const generateMockPose = (exerciseType: string): Pose => {
   // Generate random keypoints based on exercise type
   let keypoints: KeyPoint[] = [];
   
+  // Add randomness but with a bias toward completing reps
+  const completionBias = Math.random() > 0.7; // 30% chance of showing completion pose
+  
   switch (exerciseType) {
     case 'squats':
-      // Mock different squat positions for testing
-      const isSquatDown = Math.random() > 0.5;
-      const hipY = isSquatDown ? 300 : 200;
-      const kneeY = isSquatDown ? 350 : 300;
-      
-      keypoints = [
-        { name: 'left_hip', x: 100, y: hipY },
-        { name: 'left_knee', x: 100, y: kneeY },
-        { name: 'left_ankle', x: 100, y: 400 },
-        { name: 'right_hip', x: 140, y: hipY },
-        { name: 'right_knee', x: 140, y: kneeY },
-        { name: 'right_ankle', x: 140, y: 400 }
-      ];
+      // Make squatDown alternate more predictably for testing
+      if (squatDown) {
+        // If we're currently in squat down position, show standing up (with some randomness)
+        const standingUpChance = completionBias ? 0.8 : 0.4; // Higher chance to stand up if biased
+        if (Math.random() < standingUpChance) {
+          // Show standing up pose
+          keypoints = [
+            { name: 'left_hip', x: 100, y: 200, score: 0.9 },
+            { name: 'left_knee', x: 100, y: 300, score: 0.9 },
+            { name: 'left_ankle', x: 100, y: 400, score: 0.9 },
+            { name: 'right_hip', x: 140, y: 200, score: 0.9 },
+            { name: 'right_knee', x: 140, y: 300, score: 0.9 },
+            { name: 'right_ankle', x: 140, y: 400, score: 0.9 }
+          ];
+        } else {
+          // Still in squat position
+          keypoints = [
+            { name: 'left_hip', x: 100, y: 300, score: 0.9 },
+            { name: 'left_knee', x: 100, y: 350, score: 0.9 },
+            { name: 'left_ankle', x: 100, y: 400, score: 0.9 },
+            { name: 'right_hip', x: 140, y: 300, score: 0.9 },
+            { name: 'right_knee', x: 140, y: 350, score: 0.9 },
+            { name: 'right_ankle', x: 140, y: 400, score: 0.9 }
+          ];
+        }
+      } else {
+        // If we're standing up, show squatting down (with some randomness)
+        const squattingDownChance = completionBias ? 0.7 : 0.3; // Higher chance to squat if biased
+        if (Math.random() < squattingDownChance) {
+          // Show squatting down pose
+          keypoints = [
+            { name: 'left_hip', x: 100, y: 300, score: 0.9 },
+            { name: 'left_knee', x: 100, y: 350, score: 0.9 },
+            { name: 'left_ankle', x: 100, y: 400, score: 0.9 },
+            { name: 'right_hip', x: 140, y: 300, score: 0.9 },
+            { name: 'right_knee', x: 140, y: 350, score: 0.9 },
+            { name: 'right_ankle', x: 140, y: 400, score: 0.9 }
+          ];
+        } else {
+          // Still standing
+          keypoints = [
+            { name: 'left_hip', x: 100, y: 200, score: 0.9 },
+            { name: 'left_knee', x: 100, y: 300, score: 0.9 },
+            { name: 'left_ankle', x: 100, y: 400, score: 0.9 },
+            { name: 'right_hip', x: 140, y: 200, score: 0.9 },
+            { name: 'right_knee', x: 140, y: 300, score: 0.9 },
+            { name: 'right_ankle', x: 140, y: 400, score: 0.9 }
+          ];
+        }
+      }
       break;
     
     case 'pullups':
-      // Mock pullup positions for testing
-      const isPullupUp = Math.random() > 0.5;
-      const shoulderY = isPullupUp ? 150 : 200;
-      const elbowY = isPullupUp ? 120 : 230;
-      
-      keypoints = [
-        { name: 'left_shoulder', x: 100, y: shoulderY },
-        { name: 'left_elbow', x: 120, y: elbowY },
-        { name: 'left_wrist', x: 140, y: 100 },
-        { name: 'right_shoulder', x: 180, y: shoulderY },
-        { name: 'right_elbow', x: 160, y: elbowY },
-        { name: 'right_wrist', x: 140, y: 100 }
-      ];
+      // Make pullupUp alternate more predictably for testing
+      if (pullupUp) {
+        // If we're currently pulled up, show coming down (with some randomness)
+        const comingDownChance = completionBias ? 0.8 : 0.4; 
+        if (Math.random() < comingDownChance) {
+          // Show arms extended pose
+          keypoints = [
+            { name: 'left_shoulder', x: 100, y: 200, score: 0.9 },
+            { name: 'left_elbow', x: 120, y: 230, score: 0.9 },
+            { name: 'left_wrist', x: 140, y: 100, score: 0.9 },
+            { name: 'right_shoulder', x: 180, y: 200, score: 0.9 },
+            { name: 'right_elbow', x: 160, y: 230, score: 0.9 },
+            { name: 'right_wrist', x: 140, y: 100, score: 0.9 }
+          ];
+        } else {
+          // Still in pull up position
+          keypoints = [
+            { name: 'left_shoulder', x: 100, y: 150, score: 0.9 },
+            { name: 'left_elbow', x: 120, y: 120, score: 0.9 },
+            { name: 'left_wrist', x: 140, y: 100, score: 0.9 },
+            { name: 'right_shoulder', x: 180, y: 150, score: 0.9 },
+            { name: 'right_elbow', x: 160, y: 120, score: 0.9 },
+            { name: 'right_wrist', x: 140, y: 100, score: 0.9 }
+          ];
+        }
+      } else {
+        // If we're hanging, show pulling up (with some randomness)
+        const pullingUpChance = completionBias ? 0.7 : 0.3;
+        if (Math.random() < pullingUpChance) {
+          // Show pulled up pose
+          keypoints = [
+            { name: 'left_shoulder', x: 100, y: 150, score: 0.9 },
+            { name: 'left_elbow', x: 120, y: 120, score: 0.9 },
+            { name: 'left_wrist', x: 140, y: 100, score: 0.9 },
+            { name: 'right_shoulder', x: 180, y: 150, score: 0.9 },
+            { name: 'right_elbow', x: 160, y: 120, score: 0.9 },
+            { name: 'right_wrist', x: 140, y: 100, score: 0.9 }
+          ];
+        } else {
+          // Still hanging
+          keypoints = [
+            { name: 'left_shoulder', x: 100, y: 200, score: 0.9 },
+            { name: 'left_elbow', x: 120, y: 230, score: 0.9 },
+            { name: 'left_wrist', x: 140, y: 100, score: 0.9 },
+            { name: 'right_shoulder', x: 180, y: 200, score: 0.9 },
+            { name: 'right_elbow', x: 160, y: 230, score: 0.9 },
+            { name: 'right_wrist', x: 140, y: 100, score: 0.9 }
+          ];
+        }
+      }
       break;
       
     case 'skipping':
-      // Mock skipping positions
-      const isJumping = Math.random() > 0.5;
-      const ankleY = isJumping ? 350 : 400;
-      
-      keypoints = [
-        { name: 'left_ankle', x: 100, y: ankleY },
-        { name: 'right_ankle', x: 140, y: ankleY },
-        { name: 'left_knee', x: 100, y: ankleY - 100 },
-        { name: 'right_knee', x: 140, y: ankleY - 100 }
-      ];
+      // Make skipping alternate more predictably for testing
+      if (skippingUp) {
+        // If we're currently in the air, show landing (with some randomness)
+        const landingChance = completionBias ? 0.8 : 0.4;
+        if (Math.random() < landingChance) {
+          // Show feet on ground
+          keypoints = [
+            { name: 'left_ankle', x: 100, y: 400, score: 0.9 },
+            { name: 'right_ankle', x: 140, y: 400, score: 0.9 },
+            { name: 'left_knee', x: 100, y: 300, score: 0.9 },
+            { name: 'right_knee', x: 140, y: 300, score: 0.9 }
+          ];
+        } else {
+          // Still in the air
+          keypoints = [
+            { name: 'left_ankle', x: 100, y: 350, score: 0.9 },
+            { name: 'right_ankle', x: 140, y: 350, score: 0.9 },
+            { name: 'left_knee', x: 100, y: 250, score: 0.9 },
+            { name: 'right_knee', x: 140, y: 250, score: 0.9 }
+          ];
+        }
+      } else {
+        // If we're on the ground, show jumping (with some randomness)
+        const jumpingChance = completionBias ? 0.7 : 0.3;
+        if (Math.random() < jumpingChance) {
+          // Show feet in air
+          keypoints = [
+            { name: 'left_ankle', x: 100, y: 350, score: 0.9 },
+            { name: 'right_ankle', x: 140, y: 350, score: 0.9 },
+            { name: 'left_knee', x: 100, y: 250, score: 0.9 },
+            { name: 'right_knee', x: 140, y: 250, score: 0.9 }
+          ];
+        } else {
+          // Still on ground
+          keypoints = [
+            { name: 'left_ankle', x: 100, y: 400, score: 0.9 },
+            { name: 'right_ankle', x: 140, y: 400, score: 0.9 },
+            { name: 'left_knee', x: 100, y: 300, score: 0.9 },
+            { name: 'right_knee', x: 140, y: 300, score: 0.9 }
+          ];
+        }
+      }
       break;
       
     default:
@@ -109,16 +228,33 @@ export const analyzeSquats = (pose: Pose): boolean => {
   // Calculate angles
   const angle = calculateAngle(leftHip, leftKnee, leftAnkle);
   
-  // Detect squat movement pattern
-  let repCompleted = false;
-  if (angle < 100 && !squatDown) {
-    squatDown = true;
-  } else if (angle > 160 && squatDown) {
-    repCompleted = true;
-    squatDown = false;
+  // Detect squat movement pattern with debouncing
+  const currentSquatDown = angle < 120;
+  
+  // Increment position counter if stable, reset otherwise
+  if (currentSquatDown === lastSquatState) {
+    squatPositionCounter++;
+  } else {
+    squatPositionCounter = 0;
+    lastSquatState = currentSquatDown;
   }
   
-  return repCompleted;
+  // Only register position after a few stable frames
+  const STABLE_FRAMES = 3;
+  if (squatPositionCounter >= STABLE_FRAMES) {
+    let repCompleted = false;
+    
+    if (currentSquatDown && !squatDown) {
+      squatDown = true;
+    } else if (!currentSquatDown && squatDown) {
+      repCompleted = true;
+      squatDown = false;
+    }
+    
+    return repCompleted;
+  }
+  
+  return false;
 };
 
 export const analyzePullups = (pose: Pose): boolean => {
@@ -129,16 +265,33 @@ export const analyzePullups = (pose: Pose): boolean => {
   // Calculate angles
   const angle = calculateAngle(leftShoulder, leftElbow, leftWrist);
   
-  // Detect pullup movement pattern
-  let repCompleted = false;
-  if (angle < 90 && !pullupUp) {
-    pullupUp = true;
-  } else if (angle > 150 && pullupUp) {
-    repCompleted = true;
-    pullupUp = false;
+  // Detect pullup movement pattern with debouncing
+  const currentPullupUp = angle < 130;
+  
+  // Increment position counter if stable, reset otherwise
+  if (currentPullupUp === lastPullupState) {
+    pullupPositionCounter++;
+  } else {
+    pullupPositionCounter = 0;
+    lastPullupState = currentPullupUp;
   }
   
-  return repCompleted;
+  // Only register position after a few stable frames
+  const STABLE_FRAMES = 3;
+  if (pullupPositionCounter >= STABLE_FRAMES) {
+    let repCompleted = false;
+    
+    if (currentPullupUp && !pullupUp) {
+      pullupUp = true;
+    } else if (!currentPullupUp && pullupUp) {
+      repCompleted = true;
+      pullupUp = false;
+    }
+    
+    return repCompleted;
+  }
+  
+  return false;
 };
 
 export const analyzeSkipping = (pose: Pose): boolean => {
@@ -150,16 +303,33 @@ export const analyzeSkipping = (pose: Pose): boolean => {
   
   const avgAnkleY = (leftAnkle.y + rightAnkle.y) / 2;
   
-  // Detect skipping movement pattern
-  let repCompleted = false;
-  if (avgAnkleY < 370 && !skippingUp) {
-    skippingUp = true;
-  } else if (avgAnkleY > 390 && skippingUp) {
-    repCompleted = true;
-    skippingUp = false;
+  // Detect skipping movement pattern with debouncing
+  const currentSkippingUp = avgAnkleY < 380;
+  
+  // Increment position counter if stable, reset otherwise
+  if (currentSkippingUp === lastSkippingState) {
+    skippingPositionCounter++;
+  } else {
+    skippingPositionCounter = 0;
+    lastSkippingState = currentSkippingUp;
   }
   
-  return repCompleted;
+  // Only register position after a few stable frames
+  const STABLE_FRAMES = 3;
+  if (skippingPositionCounter >= STABLE_FRAMES) {
+    let repCompleted = false;
+    
+    if (currentSkippingUp && !skippingUp) {
+      skippingUp = true;
+    } else if (!currentSkippingUp && skippingUp) {
+      repCompleted = true;
+      skippingUp = false;
+    }
+    
+    return repCompleted;
+  }
+  
+  return false;
 };
 
 // Main analysis function that works for all exercise types

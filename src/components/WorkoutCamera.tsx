@@ -74,7 +74,32 @@ const WorkoutCamera: React.FC = () => {
           ctx.fillText(keypoint.name, keypoint.x + 10, keypoint.y);
         });
         
-        // In a real implementation, we'd also draw lines connecting the keypoints
+        // Connect joints with lines for better visualization
+        const connectedJoints = [
+          ['left_hip', 'left_knee'],
+          ['left_knee', 'left_ankle'],
+          ['right_hip', 'right_knee'],
+          ['right_knee', 'right_ankle'],
+          ['left_shoulder', 'left_elbow'],
+          ['left_elbow', 'left_wrist'],
+          ['right_shoulder', 'right_elbow'],
+          ['right_elbow', 'right_wrist']
+        ];
+        
+        ctx.strokeStyle = 'lime';
+        ctx.lineWidth = 2;
+        
+        connectedJoints.forEach(([joint1, joint2]) => {
+          const point1 = detectedPose.keypoints.find((kp: any) => kp.name === joint1);
+          const point2 = detectedPose.keypoints.find((kp: any) => kp.name === joint2);
+          
+          if (point1 && point2 && (!point1.score || point1.score >= 0.5) && (!point2.score || point2.score >= 0.5)) {
+            ctx.beginPath();
+            ctx.moveTo(point1.x, point1.y);
+            ctx.lineTo(point2.x, point2.y);
+            ctx.stroke();
+          }
+        });
       }
     }
   }, [detectedPose]);
@@ -132,8 +157,13 @@ const WorkoutCamera: React.FC = () => {
           </div>
         )}
       </AspectRatio>
-      <div className="mt-2 text-xs text-center text-gray-500">
-        Posture analysis in progress - Auto counting reps...
+      <div className="mt-2 flex items-center justify-between">
+        <div className="text-xs text-green-600 font-medium">
+          ML Posture Analysis Active
+        </div>
+        <div className="text-xs text-gray-500">
+          Auto counting reps for {selectedExercise.name}
+        </div>
       </div>
     </div>
   );

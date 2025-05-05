@@ -11,6 +11,7 @@ export const useCamera = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [detectedPose, setDetectedPose] = useState<any>(null);
   const analyzeIntervalRef = useRef<number | null>(null);
+  const lastRepTimeRef = useRef<number>(Date.now());
 
   const startCamera = async () => {
     try {
@@ -87,20 +88,30 @@ export const useCamera = () => {
     }
     
     setIsAnalyzing(true);
+    console.log(`Starting pose analysis for: ${exerciseType}`);
     
-    // In real implementation, this would analyze video frames
-    // For now, we'll use mock data to simulate pose detection
+    // Rate limit rep detection to prevent multiple counts in rapid succession
+    const MIN_TIME_BETWEEN_REPS_MS = 1000; // 1 second cooldown between reps
+    
     analyzeIntervalRef.current = window.setInterval(() => {
-      // Generate mock pose data
+      // Log for debugging
+      console.log("Processing frame for posture analysis");
+      
+      // Generate mock pose data (this would be replaced by real ML detection)
       const pose = generateMockPose(exerciseType);
       setDetectedPose(pose);
       
       // Analyze exercise and check if rep is completed
-      const isRepCompleted = analyzeExercise(exerciseType, pose);
-      
-      if (isRepCompleted) {
-        // Call callback function when rep is completed
-        onRepComplete();
+      const currentTime = Date.now();
+      if (currentTime - lastRepTimeRef.current >= MIN_TIME_BETWEEN_REPS_MS) {
+        const isRepCompleted = analyzeExercise(exerciseType, pose);
+        
+        if (isRepCompleted) {
+          console.log(`Rep completed for ${exerciseType}!`);
+          lastRepTimeRef.current = currentTime;
+          // Call callback function when rep is completed
+          onRepComplete();
+        }
       }
     }, 500); // Check every 500ms
   };
