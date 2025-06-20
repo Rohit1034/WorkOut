@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { generateMockPose, analyzeExercise } from '@/utils/poseAnalysis';
-import { Pose as MediaPipePose, POSE_LANDMARKS, Results, NormalizedLandmark } from '@mediapipe/pose';
+import { POSE_LANDMARKS, Results, NormalizedLandmark } from '@mediapipe/pose';
 
 export const useCamera = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -12,7 +12,7 @@ export const useCamera = () => {
   const [detectedPose, setDetectedPose] = useState<any>(null);
   const analyzeIntervalRef = useRef<number | null>(null);
   const lastRepTimeRef = useRef<number>(Date.now());
-  const poseRef = useRef<MediaPipePose | null>(null);
+  const poseRef = useRef<any>(null);
   const isAnalyzingRef = useRef(false);
 
   // Correct keypoint names for MediaPipe Pose
@@ -108,15 +108,17 @@ export const useCamera = () => {
   };
 
   // Start analyzing exercise movements
-  const startAnalyzing = (exerciseType: string, onRepComplete: () => void) => {
+  const startAnalyzing = async (exerciseType: string, onRepComplete: () => void) => {
     isAnalyzingRef.current = true;
     setIsAnalyzing(true);
     console.log(`Starting pose analysis for: ${exerciseType}`);
-    
-    // Initialize MediaPipe Pose if not already
+
+    // Dynamically import MediaPipePose for production compatibility
     if (!poseRef.current) {
+      const poseModule = await import('@mediapipe/pose');
+      const MediaPipePose = poseModule.Pose;
       poseRef.current = new MediaPipePose({
-        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+        locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
       });
       poseRef.current.setOptions({
         modelComplexity: 1,
@@ -128,11 +130,11 @@ export const useCamera = () => {
       poseRef.current.onResults((results: Results) => {
         if (results.poseLandmarks) {
           const keypoints = mapMediaPipeKeypoints(results.poseLandmarks);
-          
           const pose = { keypoints };
           setDetectedPose(pose);
           // Analyze exercise and check if rep is completed
           const currentTime = Date.now();
+          // Pass cameraResolution.height for dynamic threshold
           if (currentTime - lastRepTimeRef.current >= 1000) {
             const isRepCompleted = analyzeExercise(exerciseType, pose, cameraResolution.height);
             if (isRepCompleted) {
