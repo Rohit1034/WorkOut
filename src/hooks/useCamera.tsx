@@ -127,7 +127,9 @@ export const useCamera = () => {
         minDetectionConfidence: 0.5,
         minTrackingConfidence: 0.5
       });
+      console.log('MediaPipe Pose model loaded');
       poseRef.current.onResults((results: Results) => {
+        console.log('onResults called', results);
         if (results.poseLandmarks) {
           const keypoints = mapMediaPipeKeypoints(results.poseLandmarks);
           const pose = { keypoints };
