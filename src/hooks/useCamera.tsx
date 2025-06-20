@@ -1,6 +1,6 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { generateMockPose, analyzeExercise } from '@/utils/poseAnalysis';
+import { Pose as MediaPipePose, POSE_LANDMARKS, Results, NormalizedLandmark } from '@mediapipe/pose';
 
 export const useCamera = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -12,6 +12,18 @@ export const useCamera = () => {
   const [detectedPose, setDetectedPose] = useState<any>(null);
   const analyzeIntervalRef = useRef<number | null>(null);
   const lastRepTimeRef = useRef<number>(Date.now());
+  const poseRef = useRef<MediaPipePose | null>(null);
+  const isAnalyzingRef = useRef(false);
+
+  // Correct keypoint names for MediaPipe Pose
+  const keypointNames = [
+    'nose', 'left_eye_inner', 'left_eye', 'left_eye_outer', 'right_eye_inner', 'right_eye', 'right_eye_outer',
+    'left_ear', 'right_ear', 'mouth_left', 'mouth_right', 'left_shoulder', 'right_shoulder',
+    'left_elbow', 'right_elbow', 'left_wrist', 'right_wrist', 'left_pinky', 'right_pinky',
+    'left_index', 'right_index', 'left_thumb', 'right_thumb', 'left_hip', 'right_hip',
+    'left_knee', 'right_knee', 'left_ankle', 'right_ankle', 'left_heel', 'right_heel',
+    'left_foot_index', 'right_foot_index'
+  ];
 
   const startCamera = async () => {
     try {
@@ -81,48 +93,73 @@ export const useCamera = () => {
     return null;
   };
   
+  // Helper to map MediaPipe keypoints to app format
+  const mapMediaPipeKeypoints = (landmarks: NormalizedLandmark[] | undefined): any[] => {
+    if (!landmarks) return [];
+    return keypointNames.map((name, idx) => {
+      const lm = landmarks[idx];
+      return {
+        name,
+        x: lm ? lm.x * cameraResolution.width : 0,
+        y: lm ? lm.y * cameraResolution.height : 0,
+        score: lm ? lm.visibility : 0
+      };
+    });
+  };
+
   // Start analyzing exercise movements
   const startAnalyzing = (exerciseType: string, onRepComplete: () => void) => {
-    if (analyzeIntervalRef.current) {
-      clearInterval(analyzeIntervalRef.current);
-    }
-    
+    isAnalyzingRef.current = true;
     setIsAnalyzing(true);
     console.log(`Starting pose analysis for: ${exerciseType}`);
     
-    // Rate limit rep detection to prevent multiple counts in rapid succession
-    const MIN_TIME_BETWEEN_REPS_MS = 1000; // 1 second cooldown between reps
-    
-    analyzeIntervalRef.current = window.setInterval(() => {
-      // Log for debugging
-      console.log("Processing frame for posture analysis");
-      
-      // Generate mock pose data (this would be replaced by real ML detection)
-      const pose = generateMockPose(exerciseType);
-      setDetectedPose(pose);
-      
-      // Analyze exercise and check if rep is completed
-      const currentTime = Date.now();
-      if (currentTime - lastRepTimeRef.current >= MIN_TIME_BETWEEN_REPS_MS) {
-        const isRepCompleted = analyzeExercise(exerciseType, pose);
-        
-        if (isRepCompleted) {
-          console.log(`Rep completed for ${exerciseType}!`);
-          lastRepTimeRef.current = currentTime;
-          // Call callback function when rep is completed
-          onRepComplete();
+    // Initialize MediaPipe Pose if not already
+    if (!poseRef.current) {
+      poseRef.current = new MediaPipePose({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+      });
+      poseRef.current.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        enableSegmentation: false,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
+      poseRef.current.onResults((results: Results) => {
+        if (results.poseLandmarks) {
+          const keypoints = mapMediaPipeKeypoints(results.poseLandmarks);
+          
+          const pose = { keypoints };
+          setDetectedPose(pose);
+          // Analyze exercise and check if rep is completed
+          const currentTime = Date.now();
+          if (currentTime - lastRepTimeRef.current >= 1000) {
+            const isRepCompleted = analyzeExercise(exerciseType, pose, cameraResolution.height);
+            if (isRepCompleted) {
+              lastRepTimeRef.current = currentTime;
+              onRepComplete();
+            }
+          }
         }
+      });
+    }
+
+    // Start processing video frames
+    const processFrame = async () => {
+      if (videoRef.current && poseRef.current && isCameraReady) {
+        await poseRef.current.send({ image: videoRef.current });
       }
-    }, 500); // Check every 500ms
+      if (isAnalyzingRef.current) {
+        requestAnimationFrame(processFrame);
+      }
+    };
+    processFrame();
   };
   
   const stopAnalyzing = () => {
-    if (analyzeIntervalRef.current) {
-      clearInterval(analyzeIntervalRef.current);
-      analyzeIntervalRef.current = null;
-      setIsAnalyzing(false);
-      setDetectedPose(null);
-    }
+    isAnalyzingRef.current = false;
+    setIsAnalyzing(false);
+    setDetectedPose(null);
   };
 
   useEffect(() => {

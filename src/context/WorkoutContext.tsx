@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext } from 'react';
 import { Exercise, WorkoutSession, ExerciseType } from '@/types/workout';
 
@@ -57,12 +56,11 @@ export const WorkoutProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const incrementRepetitions = () => {
-    if (currentSession) {
-      setCurrentSession({
-        ...currentSession,
-        repetitions: currentSession.repetitions + 1,
-      });
-    }
+    setCurrentSession(prev =>
+      prev
+        ? { ...prev, repetitions: prev.repetitions + 1 }
+        : prev
+    );
   };
 
   return (

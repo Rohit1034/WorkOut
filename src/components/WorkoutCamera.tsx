@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 import { useCamera } from '@/hooks/useCamera';
 import { useWorkout } from '@/context/WorkoutContext';
@@ -134,6 +133,10 @@ const WorkoutCamera: React.FC = () => {
   return (
     <div className="video-container relative">
       <AspectRatio ratio={4/3} className="bg-black rounded-lg overflow-hidden">
+        {/* Skip/rep count badge */}
+        <div className="absolute top-2 left-2 z-10 bg-green-700 text-white px-4 py-2 rounded-full text-lg font-bold shadow-lg">
+          {currentSession?.repetitions ?? 0}
+        </div>
         <video
           ref={videoRef}
           autoPlay

@@ -1,4 +1,3 @@
-
 // Types for pose detection
 type KeyPoint = {
   name: string;
@@ -294,53 +293,47 @@ export const analyzePullups = (pose: Pose): boolean => {
   return false;
 };
 
-export const analyzeSkipping = (pose: Pose): boolean => {
-  const leftAnkle = pose.keypoints.find(k => k.name === 'left_ankle');
-  const rightAnkle = pose.keypoints.find(k => k.name === 'right_ankle');
-  
-  // Simple check for feet position (y coordinate)
+export const analyzeSkipping = (pose: Pose, canvasHeight?: number): boolean => {
+  const leftAnkle = pose.keypoints.find(k => k.name === 'left_ankle' && (k.score ?? 0) > 0.5);
+  const rightAnkle = pose.keypoints.find(k => k.name === 'right_ankle' && (k.score ?? 0) > 0.5);
   if (!leftAnkle || !rightAnkle) return false;
-  
+
+  // Use dynamic threshold: feet are up if avg y is less than 70% of canvas height
+  const height = canvasHeight || 480; // fallback to 480 if not provided
   const avgAnkleY = (leftAnkle.y + rightAnkle.y) / 2;
-  
-  // Detect skipping movement pattern with debouncing
-  const currentSkippingUp = avgAnkleY < 380;
-  
-  // Increment position counter if stable, reset otherwise
+  const threshold = height * 0.7;
+  const currentSkippingUp = avgAnkleY < threshold;
+
   if (currentSkippingUp === lastSkippingState) {
     skippingPositionCounter++;
   } else {
     skippingPositionCounter = 0;
     lastSkippingState = currentSkippingUp;
   }
-  
-  // Only register position after a few stable frames
+
   const STABLE_FRAMES = 3;
   if (skippingPositionCounter >= STABLE_FRAMES) {
     let repCompleted = false;
-    
     if (currentSkippingUp && !skippingUp) {
       skippingUp = true;
     } else if (!currentSkippingUp && skippingUp) {
       repCompleted = true;
       skippingUp = false;
     }
-    
     return repCompleted;
   }
-  
   return false;
 };
 
 // Main analysis function that works for all exercise types
-export const analyzeExercise = (exerciseType: string, pose: Pose): boolean => {
+export const analyzeExercise = (exerciseType: string, pose: Pose, canvasHeight?: number): boolean => {
   switch (exerciseType) {
     case 'squats':
       return analyzeSquats(pose);
     case 'pullups':
       return analyzePullups(pose);
     case 'skipping':
-      return analyzeSkipping(pose);
+      return analyzeSkipping(pose, canvasHeight);
     default:
       return false;
   }
