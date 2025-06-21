@@ -19,4 +19,16 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          mediapipe: ['@mediapipe/pose'],
+        },
+      },
+    },
+  },
+  optimizeDeps: {
+    include: ['@mediapipe/pose'],
+  },
 }));

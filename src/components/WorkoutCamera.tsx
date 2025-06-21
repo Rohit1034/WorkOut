@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { useCamera } from '@/hooks/useCamera';
 import { useWorkout } from '@/context/WorkoutContext';
 import { Button } from '@/components/ui/button';
-import { Camera } from 'lucide-react';
+import { Camera, Loader2 } from 'lucide-react';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 
 const WorkoutCamera: React.FC = () => {
@@ -13,6 +13,8 @@ const WorkoutCamera: React.FC = () => {
     startCamera, 
     stopCamera, 
     detectedPose,
+    isModelLoading,
+    useFallbackMode,
     startAnalyzing,
     stopAnalyzing
   } = useCamera();
@@ -34,7 +36,7 @@ const WorkoutCamera: React.FC = () => {
 
   // Start analyzing posture once camera is ready
   useEffect(() => {
-    if (isCameraReady && selectedExercise) {
+    if (isCameraReady && selectedExercise && !isModelLoading) {
       // Initialize ML model for posture analysis
       console.log('Starting pose analysis for:', selectedExercise.type);
       
@@ -48,7 +50,7 @@ const WorkoutCamera: React.FC = () => {
     return () => {
       stopAnalyzing();
     };
-  }, [isCameraReady, selectedExercise]);
+  }, [isCameraReady, selectedExercise, isModelLoading]);
 
   // Draw pose keypoints on canvas
   useEffect(() => {
@@ -149,23 +151,30 @@ const WorkoutCamera: React.FC = () => {
           className="absolute inset-0 h-full w-full"
           style={{ pointerEvents: 'none' }}
         />
-        {!isCameraReady && (
+        {(!isCameraReady || isModelLoading) && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/75 text-white rounded-lg">
             <div className="text-center">
               <div className="animate-pulse mb-2">
-                <Camera className="h-10 w-10 mx-auto" />
+                {isModelLoading ? (
+                  <Loader2 className="h-10 w-10 mx-auto animate-spin" />
+                ) : (
+                  <Camera className="h-10 w-10 mx-auto" />
+                )}
               </div>
-              <p>Loading camera...</p>
+              <p>{isModelLoading ? 'Loading AI Model...' : 'Loading camera...'}</p>
+              {isModelLoading && (
+                <p className="text-sm text-gray-300 mt-1">This may take a few seconds</p>
+              )}
             </div>
           </div>
         )}
       </AspectRatio>
       <div className="mt-2 flex items-center justify-between">
         <div className="text-xs text-green-600 font-medium">
-          ML Posture Analysis Active
+          {isModelLoading ? 'Loading AI Model...' : useFallbackMode ? 'Demo Mode Active' : 'ML Posture Analysis Active'}
         </div>
         <div className="text-xs text-gray-500">
-          Auto counting reps for {selectedExercise.name}
+          {useFallbackMode ? 'Demo mode - showing sample data' : `Auto counting reps for ${selectedExercise.name}`}
         </div>
       </div>
     </div>
