@@ -55,17 +55,14 @@ export const useCamera = () => {
         }
       }
       
-      console.log('🔄 STEP 1.2: Importing MediaPipe module...');
-      const poseModule = await import('@mediapipe/pose');
-      console.log('✅ MediaPipe module imported successfully');
-      console.log('🧐 Inspecting imported poseModule:', poseModule);
-      
-      const MediaPipePose = poseModule.Pose || (poseModule.default && poseModule.default.Pose) || poseModule.default;
-      console.log('✅ Found MediaPipePose constructor:', MediaPipePose);
+      console.log('🔄 STEP 1.2: Checking for global MediaPipe Pose...');
+      // @ts-ignore
+      const MediaPipePose = window.Pose;
 
       if (typeof MediaPipePose !== 'function') {
-        throw new Error('Failed to find Pose constructor in MediaPipe module.');
+        throw new Error('Failed to find Pose constructor on window object. Check if pose.js is loaded.');
       }
+      console.log('✅ Found MediaPipePose constructor on window object');
       
       console.log('🔄 STEP 1.3: Creating MediaPipe instance...');
       poseRef.current = new MediaPipePose({
