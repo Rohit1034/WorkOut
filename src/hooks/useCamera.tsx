@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { generateMockPose, analyzeExercise } from '@/utils/poseAnalysis';
 import { POSE_LANDMARKS, Results, NormalizedLandmark } from '@mediapipe/pose';
 
@@ -29,7 +29,7 @@ export const useCamera = () => {
   ];
 
   // Initialize MediaPipe Pose model FIRST
-  const initializeMediaPipe = async (): Promise<boolean> => {
+  const initializeMediaPipe = useCallback(async (): Promise<boolean> => {
     try {
       setIsModelLoading(true);
       console.log('🔄 STEP 1: Initializing MediaPipe Pose model...');
@@ -91,9 +91,9 @@ export const useCamera = () => {
     } catch (error) {
       console.error('❌ Failed to initialize MediaPipe:', error);
       console.error('Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
+        name: (error as Error).name,
+        message: (error as Error).message,
+        stack: (error as Error).stack
       });
       setIsModelLoading(false);
       console.log('🔄 Falling back to mock pose detection');
@@ -101,10 +101,10 @@ export const useCamera = () => {
       setIsMediaPipeReady(true); // Mark as ready so we can proceed with fallback
       return false;
     }
-  };
+  }, []);
 
   // Start camera ONLY after MediaPipe is ready
-  const startCamera = async () => {
+  const startCamera = useCallback(async () => {
     try {
       if (streamRef.current) {
         return;
@@ -115,8 +115,8 @@ export const useCamera = () => {
       const constraints = {
         video: { 
           facingMode: 'user',
-          width: { ideal: cameraResolution.width },
-          height: { ideal: cameraResolution.height },
+          width: { ideal: 640 },
+          height: { ideal: 480 },
           aspectRatio: { ideal: 4/3 }
         }
       };
@@ -143,10 +143,10 @@ export const useCamera = () => {
       console.error('❌ Error accessing camera:', err);
       setError('Failed to access camera. Please check permissions.');
     }
-  };
+  }, []);
 
   // Initialize everything in the correct order
-  const initializeEverything = async () => {
+  const initializeEverything = useCallback(async () => {
     console.log('🚀 Starting initialization sequence...');
     
     // Step 1: Load MediaPipe first
@@ -161,24 +161,30 @@ export const useCamera = () => {
       // Still start camera for fallback mode
       await startCamera();
     }
-  };
+  }, [initializeMediaPipe, startCamera]);
 
-  const stopCamera = () => {
+  const stopAnalyzing = useCallback(() => {
+    isAnalyzingRef.current = false;
+    setIsAnalyzing(false);
+    setDetectedPose(null);
+    
+    if (analyzeIntervalRef.current) {
+      clearInterval(analyzeIntervalRef.current);
+      analyzeIntervalRef.current = null;
+    }
+  }, []);
+
+  const stopCamera = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
       setIsCameraReady(false);
     }
-    
-    if (analyzeIntervalRef.current) {
-      clearInterval(analyzeIntervalRef.current);
-      analyzeIntervalRef.current = null;
-      setIsAnalyzing(false);
-    }
-  };
+    stopAnalyzing();
+  }, [stopAnalyzing]);
 
   // Capture a frame from the video
-  const captureFrame = () => {
+  const captureFrame = useCallback(() => {
     if (!videoRef.current || !isCameraReady) return null;
     
     const canvas = document.createElement('canvas');
@@ -191,7 +197,7 @@ export const useCamera = () => {
       return canvas.toDataURL('image/jpeg');
     }
     return null;
-  };
+  }, [isCameraReady]);
   
   // Helper to map MediaPipe keypoints to app format
   const mapMediaPipeKeypoints = (landmarks: NormalizedLandmark[] | undefined): any[] => {
@@ -208,7 +214,7 @@ export const useCamera = () => {
   };
 
   // Fallback pose detection using mock data
-  const startFallbackAnalysis = (exerciseType: string, onRepComplete: () => void) => {
+  const startFallbackAnalysis = useCallback((exerciseType: string, onRepComplete: () => void) => {
     console.log('🎭 Using fallback pose detection for:', exerciseType);
     
     const interval = setInterval(() => {
@@ -233,10 +239,10 @@ export const useCamera = () => {
     }, 100); // Update every 100ms for smooth animation
     
     analyzeIntervalRef.current = interval;
-  };
+  }, [cameraResolution.height]);
 
   // Start analyzing exercise movements
-  const startAnalyzing = async (exerciseType: string, onRepComplete: () => void) => {
+  const startAnalyzing = useCallback(async (exerciseType: string, onRepComplete: () => void) => {
     if (isAnalyzingRef.current) return;
     
     console.log('🔄 STEP 3: Starting pose analysis for:', exerciseType);
@@ -295,25 +301,13 @@ export const useCamera = () => {
       }
     };
     processFrame();
-  };
+  }, [useFallbackMode, startFallbackAnalysis, isCameraReady, cameraResolution.height, cameraResolution.width]);
   
-  const stopAnalyzing = () => {
-    isAnalyzingRef.current = false;
-    setIsAnalyzing(false);
-    setDetectedPose(null);
-    
-    if (analyzeIntervalRef.current) {
-      clearInterval(analyzeIntervalRef.current);
-      analyzeIntervalRef.current = null;
-    }
-  };
-
   useEffect(() => {
     return () => {
       stopCamera();
-      stopAnalyzing();
     };
-  }, []);
+  }, [stopCamera]);
 
   return {
     videoRef,

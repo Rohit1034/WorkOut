@@ -25,7 +25,7 @@ const WorkoutCamera: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
-    if (selectedExercise && currentSession) {
+    if (selectedExercise) {
       // Initialize everything in the correct order: MediaPipe first, then camera
       console.log('🎯 Starting workout session, initializing MediaPipe and camera...');
       initializeEverything();
@@ -33,9 +33,8 @@ const WorkoutCamera: React.FC = () => {
     
     return () => {
       stopCamera();
-      stopAnalyzing();
     };
-  }, [selectedExercise, currentSession]);
+  }, [selectedExercise, initializeEverything, stopCamera]);
 
   // Start analyzing posture once both MediaPipe and camera are ready
   useEffect(() => {
@@ -52,7 +51,7 @@ const WorkoutCamera: React.FC = () => {
     return () => {
       stopAnalyzing();
     };
-  }, [isMediaPipeReady, isCameraReady, selectedExercise, isModelLoading]);
+  }, [isMediaPipeReady, isCameraReady, selectedExercise, isModelLoading, startAnalyzing, incrementRepetitions]);
 
   // Draw pose keypoints on canvas
   useEffect(() => {
