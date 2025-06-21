@@ -6,6 +6,7 @@ export const useCamera = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [isCameraReady, setIsCameraReady] = useState(false);
+  const [isMediaPipeReady, setIsMediaPipeReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cameraResolution, setCameraResolution] = useState({ width: 640, height: 480 }); // 4:3 ratio
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -27,11 +28,87 @@ export const useCamera = () => {
     'left_foot_index', 'right_foot_index'
   ];
 
+  // Initialize MediaPipe Pose model FIRST
+  const initializeMediaPipe = async (): Promise<boolean> => {
+    try {
+      setIsModelLoading(true);
+      console.log('🔄 STEP 1: Initializing MediaPipe Pose model...');
+      
+      // Test if MediaPipe files are accessible
+      const testFiles = [
+        '/mediapipe/pose_solution_wasm_bin.js',
+        '/mediapipe/pose_solution_wasm_bin.wasm',
+        '/mediapipe/pose_landmark_lite.tflite'
+      ];
+      
+      console.log('🔄 STEP 1.1: Testing file accessibility...');
+      for (const file of testFiles) {
+        try {
+          const response = await fetch(file, { method: 'HEAD' });
+          if (!response.ok) {
+            console.error(`❌ MediaPipe file not accessible: ${file} (${response.status})`);
+          } else {
+            console.log(`✅ MediaPipe file accessible: ${file}`);
+          }
+        } catch (error) {
+          console.error(`❌ Error checking MediaPipe file ${file}:`, error);
+        }
+      }
+      
+      console.log('🔄 STEP 1.2: Importing MediaPipe module...');
+      const poseModule = await import('@mediapipe/pose');
+      console.log('✅ MediaPipe module imported successfully');
+      
+      const MediaPipePose = poseModule.Pose;
+      console.log('✅ MediaPipePose constructor available');
+      
+      console.log('🔄 STEP 1.3: Creating MediaPipe instance...');
+      poseRef.current = new MediaPipePose({
+        locateFile: (file: string) => {
+          const filePath = `/mediapipe/${file}`;
+          console.log(`📁 MediaPipe requesting file: ${file} -> ${filePath}`);
+          return filePath;
+        }
+      });
+      
+      console.log('✅ MediaPipePose instance created');
+      
+      console.log('🔄 STEP 1.4: Setting MediaPipe options...');
+      await poseRef.current.setOptions({
+        modelComplexity: 1,
+        smoothLandmarks: true,
+        enableSegmentation: false,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
+      
+      console.log('✅ MediaPipe Pose model loaded successfully');
+      setIsModelLoading(false);
+      setIsMediaPipeReady(true);
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to initialize MediaPipe:', error);
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+      setIsModelLoading(false);
+      console.log('🔄 Falling back to mock pose detection');
+      setUseFallbackMode(true);
+      setIsMediaPipeReady(true); // Mark as ready so we can proceed with fallback
+      return false;
+    }
+  };
+
+  // Start camera ONLY after MediaPipe is ready
   const startCamera = async () => {
     try {
       if (streamRef.current) {
         return;
       }
+      
+      console.log('🔄 STEP 2: Starting camera...');
       
       const constraints = {
         video: { 
@@ -48,6 +125,7 @@ export const useCamera = () => {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.onloadedmetadata = () => {
+          console.log('✅ Camera ready');
           setIsCameraReady(true);
           
           // Update the actual resolution we got
@@ -60,8 +138,26 @@ export const useCamera = () => {
         };
       }
     } catch (err) {
-      console.error('Error accessing camera:', err);
+      console.error('❌ Error accessing camera:', err);
       setError('Failed to access camera. Please check permissions.');
+    }
+  };
+
+  // Initialize everything in the correct order
+  const initializeEverything = async () => {
+    console.log('🚀 Starting initialization sequence...');
+    
+    // Step 1: Load MediaPipe first
+    const mediaPipeSuccess = await initializeMediaPipe();
+    
+    if (mediaPipeSuccess) {
+      console.log('✅ MediaPipe loaded successfully, proceeding to camera');
+      // Step 2: Start camera only after MediaPipe is ready
+      await startCamera();
+    } else {
+      console.log('⚠️ MediaPipe failed, but proceeding with fallback mode');
+      // Still start camera for fallback mode
+      await startCamera();
     }
   };
 
@@ -109,76 +205,9 @@ export const useCamera = () => {
     });
   };
 
-  // Initialize MediaPipe Pose model
-  const initializeMediaPipe = async (): Promise<boolean> => {
-    try {
-      setIsModelLoading(true);
-      console.log('Initializing MediaPipe Pose model...');
-      
-      // Test if MediaPipe files are accessible
-      const testFiles = [
-        '/mediapipe/pose_solution_wasm_bin.js',
-        '/mediapipe/pose_solution_wasm_bin.wasm',
-        '/mediapipe/pose_landmark_lite.tflite'
-      ];
-      
-      for (const file of testFiles) {
-        try {
-          const response = await fetch(file, { method: 'HEAD' });
-          if (!response.ok) {
-            console.error(`MediaPipe file not accessible: ${file} (${response.status})`);
-          } else {
-            console.log(`MediaPipe file accessible: ${file}`);
-          }
-        } catch (error) {
-          console.error(`Error checking MediaPipe file ${file}:`, error);
-        }
-      }
-      
-      const poseModule = await import('@mediapipe/pose');
-      console.log('MediaPipe module imported successfully');
-      
-      const MediaPipePose = poseModule.Pose;
-      console.log('MediaPipePose constructor available');
-      
-      poseRef.current = new MediaPipePose({
-        locateFile: (file: string) => {
-          const filePath = `/mediapipe/${file}`;
-          console.log(`MediaPipe requesting file: ${file} -> ${filePath}`);
-          return filePath;
-        }
-      });
-      
-      console.log('MediaPipePose instance created');
-      
-      await poseRef.current.setOptions({
-        modelComplexity: 1,
-        smoothLandmarks: true,
-        enableSegmentation: false,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5
-      });
-      
-      console.log('MediaPipe Pose model loaded successfully');
-      setIsModelLoading(false);
-      return true;
-    } catch (error) {
-      console.error('Failed to initialize MediaPipe:', error);
-      console.error('Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
-      setIsModelLoading(false);
-      console.log('Falling back to mock pose detection');
-      setUseFallbackMode(true);
-      return false;
-    }
-  };
-
   // Fallback pose detection using mock data
   const startFallbackAnalysis = (exerciseType: string, onRepComplete: () => void) => {
-    console.log('Using fallback pose detection for:', exerciseType);
+    console.log('🎭 Using fallback pose detection for:', exerciseType);
     
     const interval = setInterval(() => {
       if (!isAnalyzingRef.current) {
@@ -208,9 +237,9 @@ export const useCamera = () => {
   const startAnalyzing = async (exerciseType: string, onRepComplete: () => void) => {
     if (isAnalyzingRef.current) return;
     
+    console.log('🔄 STEP 3: Starting pose analysis for:', exerciseType);
     isAnalyzingRef.current = true;
     setIsAnalyzing(true);
-    console.log(`Starting pose analysis for: ${exerciseType}`);
 
     // If we're already in fallback mode, use that
     if (useFallbackMode) {
@@ -218,14 +247,12 @@ export const useCamera = () => {
       return;
     }
 
-    // Initialize MediaPipe if not already done
+    // MediaPipe should already be initialized at this point
     if (!poseRef.current) {
-      const success = await initializeMediaPipe();
-      if (!success) {
-        // If MediaPipe failed, start fallback mode
-        startFallbackAnalysis(exerciseType, onRepComplete);
-        return;
-      }
+      console.error('❌ MediaPipe not initialized, switching to fallback');
+      setUseFallbackMode(true);
+      startFallbackAnalysis(exerciseType, onRepComplete);
+      return;
     }
 
     // Set up results handler
@@ -253,7 +280,7 @@ export const useCamera = () => {
         try {
           await poseRef.current.send({ image: videoRef.current });
         } catch (error) {
-          console.error('Error processing frame:', error);
+          console.error('❌ Error processing frame:', error);
           // If MediaPipe fails during processing, switch to fallback
           if (!useFallbackMode) {
             setUseFallbackMode(true);
@@ -289,7 +316,9 @@ export const useCamera = () => {
   return {
     videoRef,
     isCameraReady,
+    isMediaPipeReady,
     error,
+    initializeEverything,
     startCamera,
     stopCamera,
     captureFrame,

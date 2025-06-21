@@ -9,7 +9,9 @@ const WorkoutCamera: React.FC = () => {
   const { 
     videoRef, 
     isCameraReady, 
+    isMediaPipeReady,
     error, 
+    initializeEverything,
     startCamera, 
     stopCamera, 
     detectedPose,
@@ -24,8 +26,9 @@ const WorkoutCamera: React.FC = () => {
 
   useEffect(() => {
     if (selectedExercise && currentSession) {
-      // Start camera immediately when component loads
-      startCamera();
+      // Initialize everything in the correct order: MediaPipe first, then camera
+      console.log('🎯 Starting workout session, initializing MediaPipe and camera...');
+      initializeEverything();
     }
     
     return () => {
@@ -34,11 +37,10 @@ const WorkoutCamera: React.FC = () => {
     };
   }, [selectedExercise, currentSession]);
 
-  // Start analyzing posture once camera is ready
+  // Start analyzing posture once both MediaPipe and camera are ready
   useEffect(() => {
-    if (isCameraReady && selectedExercise && !isModelLoading) {
-      // Initialize ML model for posture analysis
-      console.log('Starting pose analysis for:', selectedExercise.type);
+    if (isMediaPipeReady && isCameraReady && selectedExercise && !isModelLoading) {
+      console.log('🎯 Both MediaPipe and camera ready, starting pose analysis');
       
       // Start analyzing with the specific exercise type
       startAnalyzing(selectedExercise.type, () => {
@@ -50,7 +52,7 @@ const WorkoutCamera: React.FC = () => {
     return () => {
       stopAnalyzing();
     };
-  }, [isCameraReady, selectedExercise, isModelLoading]);
+  }, [isMediaPipeReady, isCameraReady, selectedExercise, isModelLoading]);
 
   // Draw pose keypoints on canvas
   useEffect(() => {
@@ -122,11 +124,11 @@ const WorkoutCamera: React.FC = () => {
       <div className="p-4 bg-red-50 rounded-lg text-center">
         <p className="text-red-600">{error}</p>
         <Button 
-          onClick={startCamera}
+          onClick={initializeEverything}
           className="mt-2 bg-fitmitra-primary hover:bg-fitmitra-secondary"
         >
           <Camera className="mr-2 h-4 w-4" />
-          Retry Camera Access
+          Retry Initialization
         </Button>
       </div>
     );
@@ -151,7 +153,7 @@ const WorkoutCamera: React.FC = () => {
           className="absolute inset-0 h-full w-full"
           style={{ pointerEvents: 'none' }}
         />
-        {(!isCameraReady || isModelLoading) && (
+        {(!isMediaPipeReady || !isCameraReady || isModelLoading) && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/75 text-white rounded-lg">
             <div className="text-center">
               <div className="animate-pulse mb-2">
@@ -161,7 +163,14 @@ const WorkoutCamera: React.FC = () => {
                   <Camera className="h-10 w-10 mx-auto" />
                 )}
               </div>
-              <p>{isModelLoading ? 'Loading AI Model...' : 'Loading camera...'}</p>
+              <p>
+                {isModelLoading 
+                  ? 'Loading AI Model...' 
+                  : !isMediaPipeReady 
+                    ? 'Initializing AI...' 
+                    : 'Loading camera...'
+                }
+              </p>
               {isModelLoading && (
                 <p className="text-sm text-gray-300 mt-1">This may take a few seconds</p>
               )}
@@ -171,10 +180,18 @@ const WorkoutCamera: React.FC = () => {
       </AspectRatio>
       <div className="mt-2 flex items-center justify-between">
         <div className="text-xs text-green-600 font-medium">
-          {isModelLoading ? 'Loading AI Model...' : useFallbackMode ? 'Demo Mode Active' : 'ML Posture Analysis Active'}
+          {isModelLoading 
+            ? 'Loading AI Model...' 
+            : useFallbackMode 
+              ? 'Demo Mode Active' 
+              : 'ML Posture Analysis Active'
+          }
         </div>
         <div className="text-xs text-gray-500">
-          {useFallbackMode ? 'Demo mode - showing sample data' : `Auto counting reps for ${selectedExercise.name}`}
+          {useFallbackMode 
+            ? 'Demo mode - showing sample data' 
+            : `Auto counting reps for ${selectedExercise.name}`
+          }
         </div>
       </div>
     </div>
