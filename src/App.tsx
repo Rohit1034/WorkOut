@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -10,6 +9,7 @@ import ExerciseDetailPage from "./pages/ExerciseDetailPage";
 import WorkoutPage from "./pages/WorkoutPage";
 import SummaryPage from "./pages/SummaryPage";
 import NotFound from "./pages/NotFound";
+import MediaPipeDebug from "./components/MediaPipeDebug";
 
 const queryClient = new QueryClient();
 
@@ -25,6 +25,7 @@ const App = () => (
             <Route path="/exercise" element={<ExerciseDetailPage />} />
             <Route path="/workout" element={<WorkoutPage />} />
             <Route path="/summary" element={<SummaryPage />} />
+            <Route path="/debug" element={<MediaPipeDebug />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

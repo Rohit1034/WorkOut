@@ -115,15 +115,41 @@ export const useCamera = () => {
       setIsModelLoading(true);
       console.log('Initializing MediaPipe Pose model...');
       
+      // Test if MediaPipe files are accessible
+      const testFiles = [
+        '/mediapipe/pose_solution_wasm_bin.js',
+        '/mediapipe/pose_solution_wasm_bin.wasm',
+        '/mediapipe/pose_landmark_lite.tflite'
+      ];
+      
+      for (const file of testFiles) {
+        try {
+          const response = await fetch(file, { method: 'HEAD' });
+          if (!response.ok) {
+            console.error(`MediaPipe file not accessible: ${file} (${response.status})`);
+          } else {
+            console.log(`MediaPipe file accessible: ${file}`);
+          }
+        } catch (error) {
+          console.error(`Error checking MediaPipe file ${file}:`, error);
+        }
+      }
+      
       const poseModule = await import('@mediapipe/pose');
+      console.log('MediaPipe module imported successfully');
+      
       const MediaPipePose = poseModule.Pose;
+      console.log('MediaPipePose constructor available');
       
       poseRef.current = new MediaPipePose({
         locateFile: (file: string) => {
-          // Use local MediaPipe files from public directory
-          return `/mediapipe/${file}`;
+          const filePath = `/mediapipe/${file}`;
+          console.log(`MediaPipe requesting file: ${file} -> ${filePath}`);
+          return filePath;
         }
       });
+      
+      console.log('MediaPipePose instance created');
       
       await poseRef.current.setOptions({
         modelComplexity: 1,
@@ -138,6 +164,11 @@ export const useCamera = () => {
       return true;
     } catch (error) {
       console.error('Failed to initialize MediaPipe:', error);
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
       setIsModelLoading(false);
       console.log('Falling back to mock pose detection');
       setUseFallbackMode(true);
